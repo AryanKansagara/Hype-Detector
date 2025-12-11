@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 import * as cheerio from "cheerio";
 import Groq from "groq-sdk";
 
@@ -14,10 +15,12 @@ app.post("/api/analyze", async (req, res) => {
   try {
     const { url } = req.body;
 
-    // Launch browser
+    // Launch Chromium for Railway
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),   // key line
+      headless: chromium.headless,                       // true
     });
 
     const page = await browser.newPage();
@@ -26,28 +29,23 @@ app.post("/api/analyze", async (req, res) => {
     const html = await page.content();
     await browser.close();
 
-    // Extract text
     const $ = cheerio.load(html);
-    let text = $("body").text().replace(/\s+/g, " ").trim();
+    const text = $("body").text().replace(/\s+/g, " ").trim();
 
-    // Buzzwords
     const buzzwords = [
       "ai-powered", "artificial intelligence", "revolutionary",
       "cutting-edge", "next-gen", "innovation", "empowers",
       "synergy", "scalable", "robust", "transformative"
     ];
 
-    const lower = text.toLowerCase();
-    const found = buzzwords.filter(w => lower.includes(w));
+    const found = buzzwords.filter((b) => text.toLowerCase().includes(b));
+    const words = text.split(" ").length;
+    const buzzScore = Math.min(100, Math.round((found.length / words) * 3000));
 
-    const buzzScore = Math.min(100, Math.round((found.length / text.split(" ").length) * 3000));
-
-    // LLM Prompt
     const prompt = `
-Analyze this website text and return ONLY JSON.
+Analyze this startup website text and return ONLY JSON.
 
 TEXT: "${text.slice(0, 5000)}"
-
 Return JSON:
 {
  "fakeAIClaimsScore": 0-100,
@@ -59,7 +57,7 @@ Return JSON:
 `;
 
     const llm = await groq.chat.completions.create({
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
       response_format: { type: "json_object" }
@@ -73,11 +71,14 @@ Return JSON:
       ...output,
     });
 
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: e.message });
   }
 });
 
-// PORT
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log("Server running on port", PORT));
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
