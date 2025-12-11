@@ -15,22 +15,21 @@ app.post("/api/analyze", async (req, res) => {
   try {
     const { url } = req.body;
 
-    // Launch Chromium for Railway
     const browser = await puppeteer.launch({
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),   // key line
-      headless: chromium.headless,                       // true
     });
 
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    await page.goto(url, { waitUntil: "networkidle2" });
 
     const html = await page.content();
     await browser.close();
 
     const $ = cheerio.load(html);
-    const text = $("body").text().replace(/\s+/g, " ").trim();
+    let text = $("body").text().replace(/\s+/g, " ").trim();
 
     const buzzwords = [
       "ai-powered", "artificial intelligence", "revolutionary",
@@ -43,9 +42,10 @@ app.post("/api/analyze", async (req, res) => {
     const buzzScore = Math.min(100, Math.round((found.length / words) * 3000));
 
     const prompt = `
-Analyze this startup website text and return ONLY JSON.
+Analyze this website text and return ONLY JSON.
 
 TEXT: "${text.slice(0, 5000)}"
+
 Return JSON:
 {
  "fakeAIClaimsScore": 0-100,
@@ -72,13 +72,9 @@ Return JSON:
     });
 
   } catch (e) {
-    console.error(e);
     return res.status(500).json({ error: e.message });
   }
 });
 
 const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server on ${PORT}`));
