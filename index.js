@@ -42,19 +42,29 @@ app.post("/api/analyze", async (req, res) => {
     const buzzScore = Math.min(100, Math.round((found.length / words) * 3000));
 
     const prompt = `
-Analyze this website text and return ONLY JSON.
+      Analyze the following startup website text and return ONLY valid JSON. 
+      Do NOT include explanations, markdown, or extra text outside the JSON.
 
-TEXT: "${text.slice(0, 5000)}"
+      TEXT:
+      "${text.substring(0, 5000)}"
 
-Return JSON:
-{
- "fakeAIClaimsScore": 0-100,
- "gptWrapperProbability": 0-100,
- "kpiVaguenessScore": 0-100,
- "shouldYouInterview": "Yes | No | Maybe",
- "explanation": "short roast explaining why"
-}
-`;
+      Return EXACTLY this JSON structure with strictly these types:
+
+      {
+        "fakeAIClaimsScore": number,         // integer 0 to 100
+        "gptWrapperProbability": number,     // integer 0 to 100
+        "kpiVaguenessScore": number,         // integer 0 to 100
+        "shouldYouInterview": "Yes" | "No" | "Maybe",
+        "explanation": "string"              // short roast explaining why
+      }
+
+      Requirements:
+      - All score values must be integers between 0 and 100.
+      - "shouldYouInterview" must be EXACTLY one of: "Yes", "No", "Maybe".
+      - Do NOT include commentary outside the JSON.
+      - The JSON must be valid and parseable.
+
+      `;
 
     const llm = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
