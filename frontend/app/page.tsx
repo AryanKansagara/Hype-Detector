@@ -14,7 +14,8 @@ export default function Home() {
     setData(null);
 
     try {
-      const res = await fetch("https://backend-lively-silence-4780.fly.dev/api/analyze", {
+      const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
+      const res = await fetch(`${backend}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
